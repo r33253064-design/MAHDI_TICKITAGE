@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>مولد الملصقات الاحترافي للقطع</title>
+    <!-- مكتبة حفظ الـ PDF مباشرة -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .controls {
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            max-width: 210mm;
+            box-sizing: border-box;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .control-group input, .control-group select {
+            padding: 7px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            background: #fff;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-swap { background: #f59e0b; }
+        .btn-pdf { background: #8b5cf6; }
+        .btn-print { background: #10b981; }
+
+        /* ورقة A4 بالأبعاد الحقيقية */
+        .page {
+            width: 210mm;
+            height: 297mm;
+            background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            position: relative;
+            box-sizing: border-box;
+            display: grid;
+            gap: 0;
+            margin-bottom: 30px;
+        }
+        
+        .label-slot {
+            box-sizing: border-box;
+            display: flex;
+            overflow: hidden;
+            background: #ffffff;
+            position: relative;
+            padding: 2.5mm;
+            border-radius: 4px;
+            direction: ltr;
+        }
+        
+        .show-borders .label-slot {
+            border: 1px dashed #cbd5e1;
+        }
+
+        .label-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding-right: 2mm;
+            overflow: hidden;
+        }
+
+        .qty-text {
+            font-size: 9px;
+            font-weight: bold;
+            color: #111;
+            border-bottom: 1px dotted #888;
+            padding-bottom: 1px;
+            margin-bottom: 4px;
+        }
+
+        .ref-text {
+            font-size: 12px;
+            font-weight: 900;
+            color: #000;
+            letter-spacing: 0.5px;
+            font-family: 'Arial Black', Arial, sans-serif;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+
+        .label-divider {
+            width: 1px;
+            background-color: #333;
+            height: 85%;
+            align-self: center;
+            margin: 0 2mm;
+        }
+
+        .label-right {
+            width: 22mm;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .label-right img, .full-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .logo-placeholder {
+            font-size: 8px;
+            color: #aaa;
+            text-align: center;
+        }
+
+        @media print {
+            body { background: white; }
+            .controls { display: none; }
+            .page { box-shadow: none; margin: 0; }
+            .show-borders .label-slot { border: none !important; }
+        }
+    </style>
+</head>
+<body class="show-borders">
+
+    <div class="controls">
+        <div class="control-group">
+            <label>شكل الملصق:</label>
+            <select id="layoutSelect" onchange="initGrid()">
+                <option value="part">شعار + كمية + ريفيرونص</option>
+                <option value="img_ref">صورة + ريفيرونص</option>
+                <option value="img_only">صورة فقط</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>الصورة / الشعار:</label>
+            <input type="file" id="globalImageLoader" accept="image/*">
+        </div>
+
+        <div class="control-group">
+            <label>الكمية (Qty):</label>
+            <input type="text" id="qtyInput" value="1 Stück / piece" oninput="updateAllLabels()" style="width: 100px;">
+        </div>
+
+        <div class="control-group">
+            <label>المرجع (REF):</label>
+            <input type="text" id="refInput" value="21 21 7 670 454" oninput="updateAllLabels()" style="width: 120px;">
+        </div>
+
+        <div class="control-group">
+            <label>العرض (مم):</label>
+            <input type="number" id="labelWidth" value="63.5" step="0.5" style="width: 55px;" onchange="initGrid()">
+        </div>
+
+        <div class="control-group">
+            <label>الارتفاع (مم):</label>
+            <input type="number" id="labelHeight" value="38.1" step="0.5" style="width: 55px;" onchange="initGrid()">
+        </div>
+
+        <div class="control-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-swap" onclick="swapDimensions()">قلب 🔄</button>
+        </div>
+
+        <div class="control-group" style="flex-direction: row; align-items: flex-end; gap: 8px;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 12px;">
+                <input type="checkbox" id="toggleBordersCheck" checked onclick="toggleBorders()"> الحدود
+            </label>
+            <button class="btn btn-pdf" onclick="downloadPDF()">حفظ PDF 📥</button>
+            <button class="btn btn-print" onclick="window.print()">طباعة 🖨️</button>
+        </div>
+    </div>
+
+    <!-- مخفي لتغيير صورة ملصق فردي بالنقر عليه -->
+    <input type="file" id="singleImageLoader" accept="image/*" style="display: none;">
+
+    <div class="page" id="labelsContainer"></div>
+
+    <script>
+        const labelsContainer = document.getElementById('labelsContainer');
+        const globalImageLoader = document.getElementById('globalImageLoader');
+        const singleImageLoader = document.getElementById('singleImageLoader');
+        
+        let activeSlot = null;
+        let totalSlots = 21;
+        let globalImageSrc = "";
+
+        function initGrid() {
+            let w = document.getElementById('labelWidth').value;
+            let h = document.getElementById('labelHeight').value;
+            let layoutType = document.getElementById('layoutSelect').value;
+
+            labelsContainer.style.gridTemplateColumns = `repeat(3, ${w}mm)`;
+            labelsContainer.style.gridTemplateRows = `repeat(7, ${h}mm)`;
+            
+            let totalW = 3 * parseFloat(w);
+            let totalH = 7 * parseFloat(h);
+            let marginX = (210 - totalW) / 2;
+            let marginY = (297 - totalH) / 2;
+            
+            labelsContainer.style.paddingLeft = `${Math.max(0, marginX)}mm`;
+            labelsContainer.style.paddingRight = `${Math.max(0, marginX)}mm`;
+            labelsContainer.style.paddingTop = `${Math.max(0, marginY)}mm`;
+            labelsContainer.style.paddingBottom = `${Math.max(0, marginY)}mm`;
+
+            labelsContainer.innerHTML = '';
+            
+            const qtyText = document.getElementById('qtyInput').value;
+            const refText = document.getElementById('refInput').value;
+
+            for (let i = 0; i < totalSlots; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'label-slot';
+                slot.style.width = `${w}mm`;
+                slot.style.height = `${h}mm`;
+                
+                let slotImg = slot.dataset.imgSrc || globalImageSrc;
+
+                if (layoutType === 'part') {
+                    // تصميم: كمية + ريفيرونص في اليسار، وشعار في اليمين
+                    slot.innerHTML = `
+                        <div class="label-left">
+                            <div class="qty-text">${qtyText}</div>
+                            <div class="ref-text">${refText}</div>
+                        </div>
+                        <div class="label-divider"></div>
+                        <div class="label-right">
+                            ${slotImg ? `<img src="${slotImg}">` : `<span class="logo-placeholder">شعار</span>`}
+                        </div>
+                    `;
+                } else if (layoutType === 'img_ref') {
+                    // تصميم: صورة في اليسار، وريفيرونص في اليمين
+                    slot.innerHTML = `
+                        <div class="label-left" style="justify-content:center; align-items:center;">
+                            ${slotImg ? `<img src="${slotImg}" style="max-height:85%;">` : `<span class="logo-placeholder">صورة</span>`}
+                        </div>
+                        <div class="label-divider"></div>
+                        <div class="label-right" style="width:auto; flex:1; padding-left:2mm; justify-content:center;">
+                            <div class="ref-text" style="font-size:11px;">${refText}</div>
+                        </div>
+                    `;
+                } else {
+                    // تصميم: صورة فقط تملأ الملصق
+                    slot.innerHTML = `
+                        <div style="width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
+                            ${slotImg ? `<img src="${slotImg}" class="full-img">` : `<div class="placeholder-text" style="color:#94a3b8; font-size:11px;">ملصق ${i+1}</div>`}
+                        </div>
+                    `;
+                }
+
+                // النقر لتغيير صورة ملصق فردي
+                slot.addEventListener('click', function() {
+                    activeSlot = slot;
+                    singleImageLoader.click();
+                });
+
+                labelsContainer.appendChild(slot);
+            }
+        }
+
+        function updateAllLabels() {
+            initGrid();
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('labelsContainer');
+            const opt = {
+                margin:       0,
+                filename:     'labels_sheet.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().from(element).set(opt).save();
+        }
+
+        function swapDimensions() {
+            const widthInput = document.getElementById('labelWidth');
+            const heightInput = document.getElementById('labelHeight');
+            let temp = widthInput.value;
+            widthInput.value = heightInput.value;
+            heightInput.value = temp;
+            initGrid();
+        }
+
+        function toggleBorders() {
+            const isChecked = document.getElementById('toggleBordersCheck').checked;
+            if (isChecked) {
+                document.body.classList.add('show-borders');
+            } else {
+                document.body.classList.remove('show-borders');
+            }
+        }
+
+        globalImageLoader.addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                globalImageSrc = event.target.result;
+                document.querySelectorAll('.label-slot').forEach(s => s.dataset.imgSrc = globalImageSrc);
+                initGrid();
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        });
+
+        singleImageLoader.addEventListener('change', function(e) {
+            if (!activeSlot) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                activeSlot.dataset.imgSrc = event.target.result;
+                initGrid();
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        });
+
+        initGrid();
+    </script>
+
+</body>
+</html>
